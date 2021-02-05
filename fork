@@ -1,0 +1,16 @@
+#include<stdio.h>
+
+int main()
+{
+  pid_t pid = fork();
+  if(pid > 0){
+    printf("父进程\n");
+  }
+  else if(pid == 0){
+    printf("子进程\n");
+  }
+  else{
+    printf("error\n");
+  }
+  return 0;
+}

@@ -1,0 +1,59 @@
+//server程序
+nt main()    
+{    
+  //创建管道    
+  int f = mkfifo("fifo",0666);    
+  if(f == 0)    
+  {    
+    //success    
+    //以读的方式打开命名管道fifo,服务器端获取客户端的数据    
+    int fd = open("fifo",O_RDONLY);    
+    //读取管道内容，输出到显示器    
+    while(1)    
+    {    
+      char buffer[1024];    
+      ssize_t s = read(fd,buffer,sizeof(buffer)-1);    
+      buffer[s] = '\0';    
+      if(s == 0)    
+      {    
+        printf("client quit\n");    
+        exit(0);    
+      }    
+      else if(s > 0)    
+      {    
+        printf("server# %s",buffer);    
+        fflush(stdout);
+      }
+      else 
+      {
+        perror("read error");
+      }
+    }
+  }
+  else 
+  {
+    //error
+    perror("create error");
+  }                                                                                                                                                                                        
+  return 0;    
+}
+
+//client程序
+int main()    
+{    
+  //以写的方式打开管道    
+  int fd =  open("fifo",O_WRONLY);    
+  //向管道中写入    
+  char buffer[1024];    
+  while(1)    
+  {    
+    buffer[0] = '\0';    
+    //从标准输入获取数据    
+    printf("please enter# ");    
+    fflush(stdout);                                                                                                                                                                        
+    fgets(buffer,1024,stdin);    
+    ssize_t s = write(fd,buffer,1023);    
+    buffer[s] = '\0';    
+  }    
+  return 0;    
+}

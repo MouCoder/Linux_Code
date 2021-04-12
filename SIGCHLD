@@ -1,0 +1,26 @@
+#include<stdio.h>    
+  #include<signal.h>    
+  #include<sys/types.h>    
+  #include<sys/wait.h>    
+  #include<unistd.h>    
+  #include<stdlib.h>    
+W>void sighandler(int sig)    
+  {    
+    wait(NULL);    
+  }    
+      
+  int main()    
+  {    
+    signal(SIGCHLD,sighandler);    
+    pid_t id = fork();    
+    if(id == 0)    
+    {    
+      printf("i am child,id : %d\n",getpid());                                                                                                                                             
+      exit(1);    
+    }    
+    else    
+    {    
+      while(1);    
+    }    
+    return 0;    
+  }

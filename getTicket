@@ -1,0 +1,48 @@
+#include<stdio.h>    
+#include<pthread.h>    
+#include<unistd.h>    
+      
+pthread_mutex_t mutex;//初始化互斥量    
+int tickets = 10000;//票数，每订购一张票数减1                                                                                                                                            
+      
+void* ticket(void* arg)    
+{    
+    //模拟订票过程，多个线程（执行流）访问该程序    
+    while(1)    
+    {    
+      pthread_mutex_lock(&mutex);//加锁    
+      if(tickets > 0)    
+      {    
+        printf("%s,抢票成功，剩余票数：%d\n",(char*)arg,--tickets);    
+        pthread_mutex_unlock(&mutex);//解锁    
+        usleep(500);    
+      }    
+      else    
+      {    
+        pthread_mutex_unlock(&mutex);    
+        break;    
+      }    
+    }    
+}    
+      
+int main()    
+{    
+    //创建多个线程    
+    pthread_t tid[5];    
+    pthread_create(&tid[0],NULL,ticket,"new thread1");    
+    pthread_create(&tid[1],NULL,ticket,"new thread2");    
+    pthread_create(&tid[2],NULL,ticket,"new thread3");    
+    pthread_create(&tid[3],NULL,ticket,"new thread4");    
+    pthread_create(&tid[4],NULL,ticket,"new thread5");    
+      
+    //线程等待    
+    pthread_join(tid[0],NULL);    
+    pthread_join(tid[1],NULL);
+    pthread_join(tid[2],NULL);
+    pthread_join(tid[3],NULL);
+    pthread_join(tid[4],NULL);
+  
+    //销毁互斥量
+    pthread_mutex_destroy(&mutex);
+    return 0;
+}                           

@@ -1,0 +1,100 @@
+#pragma once                                                                                                                                                                             
+#include<iostream>
+#include<vector>
+#include<pthread.h>
+#include<semaphore.h>
+#include<unistd.h>
+  
+class RingQueue
+{
+private:
+    void P(sem_t& sem)
+    {
+        //等待信号量，信号量的值-1
+        sem_wait(&sem);
+    }
+    void V(sem_t& sem)
+    {
+        //发布信号量，信号量的值+1
+        sem_post(&sem);
+    }
+public:
+    RingQueue(size_t cap = 10)
+        :capacity(cap)
+         ,p_index(0)
+         ,c_index(0)
+         ,rq(cap)
+    {
+        //消费者的信号量初始值为0
+        sem_init(&c_sem,0,0);
+        //生产者的信号量初始值为capacity
+        sem_init(&p_sem,0,capacity);
+    }
+    void PutMessage(int message)
+    {
+        //生产者放消息
+        P(p_sem);
+        rq[p_index++] = message;
+        p_index %= capacity;
+        V(c_sem);
+    }
+    void GetMessage(int& message)
+    {
+        P(c_sem);
+        message = rq[c_index++];
+        c_index %= capacity;
+        V(p_sem);
+    }
+    ~RingQueue()
+    {
+        sem_destroy(&c_sem);
+        sem_destroy(&p_sem);
+    }
+private:
+    std::vector<int> rq;//用数组模拟环形队列
+    size_t p_index;
+    size_t c_index;
+    sem_t p_sem;//生产者信号量
+    sem_t c_sem;//消费者信号量
+    size_t capacity;//环形队列的容量
+};
+
+#include"RingQueue.hpp" 
+  void* consumer(void* arg)
+  {
+      RingQueue *rq = (RingQueue*)arg;
+      int message;
+      while(true)
+      {
+          rq->GetMessage(message);                                                                                                                                                       
+          std::cout<<"comsumer : get a message-> "<<message<<std::endl; 
+          sleep(1);
+      }
+      return nullptr;
+  }
+  
+  void* producer(void* arg)
+  {
+      RingQueue *rq = (RingQueue*)arg;
+      int count = 1;
+      while(true)
+      {
+          rq->PutMessage(count++);
+          std::cout<<"producer : put a message->"<<count<<std::endl;
+          count %= 11;
+      }
+      return nullptr;
+  }
+  
+  int main()
+  {
+      RingQueue* rq = new RingQueue;
+  
+      pthread_t c,p;
+      pthread_create(&c,nullptr,consumer,rq);
+      pthread_create(&p,nullptr,producer,rq);
+  
+      pthread_join(c,nullptr);
+      pthread_join(p,nullptr);
+      return 0;
+ }

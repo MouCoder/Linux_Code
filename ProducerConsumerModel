@@ -1,0 +1,123 @@
+#ifndef __QUEUE_BLOCK_H_                                                                                                                                                                   
+#define __QUEUE_BLOCK_H_    
+#include <iostream>    
+#include <pthread.h>    
+#include <queue>    
+#include <unistd.h>    
+    
+class BlockingQueue    
+{    
+private:    
+    //empty方法---判断阻塞队列是否为空    
+    bool IsEmpty()    
+    {    
+        //如果size为0，为空表示假    
+        return !bq.size();    
+    }    
+    bool IsFull()    
+    {    
+        //当阻塞队列中的元素个数等于阻塞队列容量时，队列为满    
+        return bq.size() == capacity;    
+    }    
+    //full方法---判断阻塞队列是否为满    
+public:    
+    //构造函数---创建一个大小为NUM的阻塞队列    
+    BlockingQueue(size_t NUM = 8)    
+      :capacity(NUM)    
+    {    
+        //初始化条件变量和互斥量    
+        pthread_mutex_init(&mutex,NULL);    
+        pthread_cond_init(&p_cond,NULL);    
+        pthread_cond_init(&c_cond,NULL);    
+    }    
+    //put方法---向阻塞队列中放数据    
+    void PutMessage(int mesg)    
+    {    
+        //当队列为空时，消费者向生产者发送一个信号，生产者开始放数据    
+        pthread_mutex_lock(&mutex);    
+        while(IsFull())    
+        {    
+            pthread_cond_signal(&c_cond);
+            std::cout<<"生产者：消费者，你可以请尽快消费..."<<std::endl;
+            std::cout<<"生产者：等待中..."<<std::endl;
+            pthread_cond_wait(&p_cond,&mutex);
+        }
+        bq.push(mesg);
+        pthread_mutex_unlock(&mutex);
+    }
+    //get方法---从阻塞队列中获取数据
+    void GetMessage(int& mesg)
+    {
+        //通过参数获取
+        pthread_mutex_lock(&mutex);
+        while(IsEmpty())
+        {
+            pthread_cond_signal(&p_cond);
+            std::cout<<"消费者：生产者，请尽快生产..."<<std::endl;
+            std::cout<<"消费者：等待中..."<<std::endl;
+            pthread_cond_wait(&c_cond,&mutex);
+        }
+        mesg = bq.front();
+        bq.pop();
+        pthread_mutex_unlock(&mutex);
+    }
+    int front()
+    {
+        if(!bq.empty())
+            return bq.front();
+        return 0;
+    }
+    //析构函数---销毁条件变量和互斥量
+    ~BlockingQueue()
+    {                                                                                                                                                                                      
+        pthread_mutex_destroy(&mutex);
+        pthread_cond_destroy(&p_cond);
+        pthread_cond_destroy(&c_cond);
+    }
+private:
+    std::queue<int> bq;//阻塞队列
+    size_t capacity;//阻塞队列的大小
+    pthread_cond_t p_cond;//生产者等待的条件变量
+    pthread_cond_t c_cond;//消费者等待的条件变量
+    pthread_mutex_t mutex;//互斥量
+};
+
+
+#include"ProducerConsumerModel.hpp"    
+    
+void* ProducerRun(void* bq)    
+{    
+    int count = 1;    
+    while(true)    
+    {    
+        //每隔1秒生产一个    
+        ((BlockingQueue*)(bq))->PutMessage(count);    
+        std::cout<<"生产者：生产成功-->"<<count++<<std::endl;    
+        sleep(1);    
+    }    
+}    
+    
+void* ConsumerRun(void* bq)    
+{    
+    sleep(1);                                                                                                                                                                              
+    while(true)    
+    {    
+        //每隔2秒消费一个    
+        int mesg;    
+        ((BlockingQueue*)(bq))->GetMessage(mesg);    
+        std::cout<<"消费者：消费成功-->"<<mesg<<std::endl;    
+    }    
+}    
+    
+int main()    
+{    
+    BlockingQueue *bq = new BlockingQueue;    
+    //创建生产者和消费者线程：单生产者<--->单消费者    
+    pthread_t p,c;//生产者消费者线程id：生产者->p 消费者->c    
+    pthread_create(&p,NULL,ProducerRun,(void*)bq);    
+    pthread_create(&c,NULL,ConsumerRun,(void*)bq);    
+    //线程等待    
+    pthread_join(p,NULL);    
+    pthread_join(c,NULL);    
+    return 0;    
+}   

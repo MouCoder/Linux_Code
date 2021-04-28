@@ -1,0 +1,101 @@
+#pragma once                                                                                                                                                                               
+#include<iostream>    
+#include<queue>    
+#include<unistd.h>    
+#include<pthread.h>    
+    
+class Task     
+{    
+private:    
+    int data;    
+public:    
+    Task(){}    
+    Task(int _data)    
+        :data(_data)    
+    {}    
+    void Run()    
+    {    
+        std::cout<<"thread ["<<pthread_self()<<"] "<<data<<" pow is : "<<data*data<<std::endl;       
+    }    
+};    
+    
+class ThreadPool    
+{    
+private:    
+    std::queue<Task*> q;//任务队列    
+    pthread_cond_t cond;//只有线程池需要在该条件下等，服务器应该一直在从网络中获取数据    
+    pthread_mutex_t mutex;//互斥锁，访问任务队列时需要加锁    
+    size_t MaxNum;//最大线程数量    
+public:    
+    ThreadPool(size_t size = 5)    
+        :MaxNum(size)    
+    {}    
+    static void* Routine(void* arg)    
+    {    
+        ThreadPool* p_this = (ThreadPool*)arg;    
+        while(true)    
+        {    
+            //从任务队列中获取任务，没有任务就休眠    
+            pthread_mutex_lock(&(p_this->mutex));   
+            while((p_this->q).empty())
+            {
+                pthread_cond_wait(&(p_this->cond),&(p_this->mutex));
+            }
+            Task t;
+            p_this->GetTask(t);
+            pthread_mutex_unlock((&p_this->mutex));
+            //执行任务
+            t.Run();
+        }
+    }
+    void ThreadPoolInit()
+    {
+        //初始化互斥锁和条件变量
+        pthread_cond_init(&cond,nullptr);
+        pthread_mutex_init(&mutex,nullptr);
+        //创建线程，并对线程进行分离
+        pthread_t tid;
+        for(size_t i = 0;i < MaxNum;i++)
+        {
+            pthread_create(&tid,nullptr,Routine,this);
+        }
+    }
+    void PutTask(Task& task)
+    {
+        //服务器从网络中获取任务放入任务队列
+        pthread_mutex_lock(&mutex);
+        q.push(&task);
+        pthread_mutex_unlock(&mutex);
+        pthread_cond_signal(&cond);                                                                                                                                                        
+    }
+    void GetTask(Task& task)
+    {
+        //线程池中的线程执行任务
+        Task* t = q.front();
+        q.pop();
+        task = *t;
+    }
+    ~ThreadPool()
+    {
+        pthread_cond_destroy(&cond);
+        pthread_mutex_destroy(&mutex);
+    }
+};                         
+
+#include"ThreadPool.hpp"    
+    
+int main()    
+{    
+    ThreadPool tp;    
+    tp.ThreadPoolInit();    
+    
+    //服务器端获取数据    
+    while(true)    
+    {    
+        int x = rand()%10 + 1;    
+        Task t(x);    
+        tp.PutTask(t);    
+        sleep(1);                                                                                                                                                                          
+    }    
+    
+}    

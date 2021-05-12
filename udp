@@ -1,0 +1,158 @@
+//服务器端
+#pragma once                                                                                                                                                                             
+      
+#include<iostream>    
+#include<string>    
+#include<unistd.h>    
+#include<sys/types.h>    
+#include<sys/socket.h>    
+#include<arpa/inet.h>    
+#include<string.h>    
+#define MAX_SIZE 128    
+      
+class Server    
+{    
+private:    
+    std::string ip;//服务器端IP地址    
+    int port;//端口号    
+    int sock;//套接字    
+public:    
+    Server(std::string _ip = "127.0.0.1",int _port = 8080)    
+      :ip(_ip),port(_port)    
+    {}    
+      
+    //初始化    
+    void init()    
+    {    
+        //创建套接字文件描述符    
+        sock = socket(AF_INET,SOCK_DGRAM,0);    
+        //绑定    
+        struct sockaddr_in local;//服务器端网络协议地址    
+        local.sin_family = AF_INET;    
+        local.sin_port = htons(port);//将端口号转为网络字节序格式    
+        local.sin_addr.s_addr = inet_addr(ip.c_str());//将ip地址从字符串转换为指定格式    
+      
+        if(bind(sock, (struct sockaddr*)&local,sizeof(local)) == -1)    
+        {    
+            //绑定失败    
+              std::cerr<<"服务器出错"<<std::endl;    
+              exit(-1);    
+        }    
+      }
+  
+      void start()
+      {
+          //接收客户端发送的数据
+          char msg[MAX_SIZE];
+          while(1)
+          {
+              struct sockaddr_in addr_end;//对端地址（发送端）
+              socklen_t len = sizeof(addr_end);
+              //接收客户端发送的数据
+              ssize_t size = recvfrom(sock, msg, sizeof(msg)-1, 0,(struct sockaddr*)&addr_end, &len) ;
+              if(size > 0)
+              {
+                  //打印接收到的消息
+                  std::cout<<"client# "<<msg<<std::endl;
+                  //对数据进行封装，在发送给客户端
+                  //对数据进行处理
+                  std::string tmp = msg;
+                  for(int i = 0;i < tmp.size();i++)
+                  {
+                      if(tmp[i] >= 'a' && tmp[i] <= 'z')
+                          tmp[i] -= 32;
+                  }
+                  sendto(sock,tmp.c_str(),tmp.size(), 0,(struct sockaddr*)&addr_end,len);
+              }
+              else 
+              {
+                  std::cout<<"没有消息"<<std::endl;
+              }
+          }
+      }
+                                                                                                                                                                                           
+      ~Server()
+      {
+          close(sock);
+      }
+  };
+ 
+//客户端
+#pragma once                                                                                                                                                                               
+    
+#include<iostream>    
+#include<string>    
+#include<unistd.h>    
+#include<sys/types.h>    
+#include<sys/socket.h>    
+#include<arpa/inet.h>    
+#include<string.h>    
+#define MAX_SIZE 128    
+    
+class Client    
+{    
+private:    
+    std::string ip;//服务器端IP地址    
+    int port;//端口号    
+    int sock;//套接字    
+public:    
+    Client(std::string _ip = "127.0.0.1",int _port = 8080)    
+      :ip(_ip),port(_port)    
+    {}    
+    
+    //初始化    
+    void init()    
+    {    
+        //创建套接字文件描述符    
+        sock = socket(AF_INET,SOCK_DGRAM,0);    
+    }    
+    
+    void start()    
+    {    
+        std::string msg;    
+        struct sockaddr_in addr_end;//对端地址（发送端）    
+        socklen_t len = sizeof(addr_end);    
+        addr_end.sin_family = AF_INET;    
+        addr_end.sin_port = htons(port);    
+        addr_end.sin_addr.s_addr = inet_addr(ip.c_str());    
+        while(1)    
+        {    
+           std::cout<<"client # ";
+            std::cin>>msg;
+            //向服务器发送数据
+            sendto(sock,msg.c_str(),msg.size(), 0,(struct sockaddr*)&addr_end,len);
+            //接收服务器发送的数据并打印
+            char tmp [MAX_SIZE];
+            ssize_t size = recvfrom(sock, tmp, sizeof(tmp)-1, 0,nullptr,nullptr) ;
+            if(size > 0)
+                std::cout<<"Server #"<<msg<<std::endl;
+        }
+    }
+ 
+    ~Client()
+    {
+        close(sock);
+    }
+};          
+
+#include"udpServer.hpp"    
+    
+int main()    
+{    
+    Server* s = new Server();    
+    s->init();    
+    s->start();    
+    delete s;                                                                                                                                                                              
+    return 0;    
+} 
+
+#include"udpClient.hpp"    
+    
+int main()    
+{    
+    Client* c = new Client();                                                                                                                                                              
+    c->init();    
+    c->start();    
+    delete c;    
+    return 0;    
+}   

@@ -1,0 +1,156 @@
+//服务器端
+#include<iostream>                                                                                                                                                                         
+#include<string>    
+#include<sys/types.h>    
+#include<sys/socket.h>    
+#include<netinet/in.h>    
+#include<arpa/inet.h>    
+#include<unistd.h>    
+    
+class tcpServer    
+{    
+private:    
+    int port;//服务器端口号    
+    int sock;//套接字，需要进行绑定    
+public:    
+    tcpServer(int _port)    
+      :port(_port)    
+    {}    
+    //初始化    
+    void initServer()    
+    {    
+        //创建套接字(IPV4使用AF_INET，面向字节流的使用SOCK_STREAM，默认为0)    
+        sock = socket(AF_INET,SOCK_STREAM,0);    
+            
+        struct sockaddr_in localAddr;//服务器端地址（包含Ip地址和端口号）    
+        localAddr.sin_family = AF_INET;    
+        localAddr.sin_port = htons(port);//端口号,将主机序转成网络序    
+        localAddr.sin_addr.s_addr = INADDR_ANY;//任意IP    
+        //绑定(套接字，地址，地址长度)    
+        if(bind(sock,(struct sockaddr*)&localAddr,sizeof(localAddr)))    
+        {    
+            //绑定失败    
+            std::cerr<<"服务器绑定失败"<<std::endl;    
+            exit(1);    
+        }    
+    
+        //监听(sock处于监听状态，最多允许等待的客户端数)    
+        listen(sock,5);    
+    }    
+    void service(int clientSock)
+    {
+        std::cout<<"servic..."<<std::endl;
+        char buf[255];
+        while(1)
+        {                                                                                                                                                                                  
+            //接收客户端发送的消息
+            int len1 = recv(clientSock,buf,sizeof(buf)-1,0);
+            if(len1 > 0)
+            {
+                buf[len1] = 0;
+                std::cout<<buf<<std::endl;
+                //向客户端发送消息
+                char* msg = buf;
+                 
+                send(clientSock,msg,sizeof(msg),0);
+            }
+        }
+    }
+    //begin
+    void startServer()
+    {
+        //接受连接
+        struct sockaddr_in clientAddr;//客户端地址
+        while(1)
+        {
+            socklen_t len = sizeof(clientAddr);
+            int clientSock = accept(sock,(struct sockaddr*)&clientAddr,&len);
+
+            if(clientSock < 0)
+            {
+                std::cout<<"accept error..."<<std::endl;
+                continue;
+            }
+ 
+            //取出客户端的IP地址和端口号
+            std::string IP = inet_ntoa(clientAddr.sin_addr);
+      
+            std::cout<<"get a new connection..."<<std::endl;
+            std::cout<<IP<<":"<<ntohs(clientAddr.sin_port)<<std::endl;
+
+            //开始服务
+            service(clientSock);
+        }
+    }
+}; 
+
+//客户端
+#pragma once                                                                                                                                                                               
+
+#include<iostream>
+#include<string>
+#include<sys/types.h>
+#include<unistd.h>
+#include<sys/socket.h>
+#include<netinet/in.h>
+#include<arpa/inet.h>
+
+class tcpClient
+{
+private:
+    int sock;//套接字
+    std::string ip;//IP地址
+    int port;//端口号
+public:
+    tcpClient(std::string _ip,int _port)
+      :ip(_ip),port(_port)
+    {}
+
+    //初始化
+    void initClient()
+    {
+       //创建套接字
+       sock = socket(AF_INET,SOCK_STREAM,0);
+
+       struct sockaddr_in addrServer;
+       addrServer.sin_family = AF_INET;
+       addrServer.sin_addr.s_addr = inet_addr(ip.c_str());
+       addrServer.sin_port = htons(port);
+       //连接
+       if(connect(sock,(struct sockaddr*)&addrServer,sizeof(addrServer)) != 0)
+       {
+          std::cout<<"connect error"<<std::endl;
+          exit(1);
+      }
+    }
+
+    //begin
+    void start()
+    {
+        std::cout<<"connect success..."<<std::endl;
+        //发送数据
+        char msg[255]; 
+        while(true)
+        {
+            std::cout<<"client #";
+            fflush(stdout);
+            //读取数据
+            int len = read(0,msg,sizeof(msg));
+            if(len > 0)
+            {
+                std::cout<<"success..."<<std::endl;
+                msg[len] = '\0';
+                //发送数据
+                send(sock,msg,sizeof(msg),0);
+                //接收数据
+                char buf[255];
+                int len1 = recv(sock,buf,sizeof(buf)-1,0);
+                if(len1 > 0)
+                {
+                    buf[len1] = 0;
+                    std::cout<<buf<<std::endl;
+                }
+            }
+        }
+    }                                                                                                                                                                                      
+};

@@ -1,0 +1,305 @@
+//calClient.hpp
+#pragma 
+once                                                                           
+                                                                               
+                     
+    
+#include<iostream>    
+#include"protocol.hpp"    
+#include<sys/types.h>    
+#include<sys/socket.h>    
+#include<netinet/in.h>    
+#include<arpa/inet.h>    
+#include<unistd.h>    
+#include<sys/wait.h>    
+    
+class calServer    
+{    
+private:    
+    int sock;//套接字    
+    int port;//端口号    
+public:    
+    //构造函数    
+    calServer(int _port)    
+      :port(_port)    
+    {}    
+        
+    //初始化    
+    void initServer()    
+    {    
+        //创建套接字    
+        sock = socket(AF_INET,SOCK_STREAM,0);    
+    
+        struct sockaddr_in local;//本地地址    
+        local.sin_family = AF_INET;    
+        local.sin_port = htons(port);//端口号（主机号转网络号）    
+        local.sin_addr.s_addr = INADDR_ANY;//IP地址，任意IP    
+        //绑定    
+        if(bind(sock,(struct sockaddr *)&local,sizeof(local)) != 0)    
+        {    
+            std::cerr<<"service bind error..."<<std::endl;    
+            exit(1);    
+        }
+
+        //监听
+        if(listen(sock,5) < 0)
+        {
+            std::cerr<<"service listen error"<<std::endl
+;                                                                              
+                                                    
+            exit(1);
+        }
+    }
+    void service(int sock)
+    {
+       struct result r;
+       //接收客户端消息
+       struct expersion rq;
+       int size = recv(sock,&rq,sizeof(rq),0);
+       if(size > 0)
+       {
+          std::cout<<"recv..."<<std::endl;
+          r.code = 0;
+          r.ret = 0;
+          switch(rq.option)
+          {
+              case '+':
+                r.ret = rq.x+rq.y;
+                break;
+              case '-':
+                r.ret = rq.x-rq.y;
+                break;
+              case '*':
+                r.ret = rq.x*rq.y;
+                break;
+              case '/':
+                if(rq.y == 0)
+                {
+                    r.code = 1;
+                }
+                else 
+                  r.ret = rq.x/rq.y;
+                break;
+              default:
+                r.code = 2;
+                break;
+          }
+          //发送消息
+          if(send(sock,&r,sizeof(r),0) <= 0)
+          {
+              std::cerr<<"send error..."<<std::endl;
+          }
+       }
+    }
+    //开始运行
+    void start()
+    {
+        while(1)
+        {
+            struct sockaddr_in clientAddr;
+            socklen_t clientAddrLen;
+            //接受链接
+            int sockClient = accept(sock,(struct sockaddr*)&clientAddr,&
+clientAddrLen);
+            if(sockClient < 0)
+            {
+                std::cerr<<"service accept error..."<<std::endl;
+                exit(1);
+            }
+            std::cout<<"get a new connection..."<<std::endl;
+            //创建进程
+            if(fork() == 0)
+            
+{                                                                              
+                                                                               
+                 
+                //子进程
+                if(fork() == 0)
+                {
+                    close(sock);
+                    //孙子进程
+                    service(sockClient);
+                    exit(1);
+                }
+                exit(0);
+            }
+            //进程等待
+            waitpid(-1,nullptr,WNOHANG);
+            close(sockClient);
+        }
+    }
+
+    //析构函数
+    ~calServer()
+    {
+        close(sock);
+    }
+}; 
+
+//calServer.hpp
+#pragma 
+once                                                                           
+                                                                               
+                   
+      
+  #include<iostream>    
+  #include<string>    
+  #include"protocol.hpp"    
+  #include<sys/types.h>    
+  #include<sys/socket.h>    
+  #include<netinet/in.h>    
+  #include<arpa/inet.h>    
+  #include<unistd.h>    
+  #include<sys/wait.h>    
+      
+  class calClient    
+  {    
+  private:    
+      int sock;//套接字    
+      std::string ip;//IP地址    
+      int port;//端口号    
+  public:    
+      //构造函数    
+      calClient(std::string _ip,int _port)    
+W>      :port(_port),ip(_ip)    
+      {}    
+          
+      //初始化    
+      void initClient()    
+      {    
+          //创建套接字    
+          sock = socket(AF_INET,SOCK_STREAM,0);    
+      }    
+      
+      void service(int sock)    
+      {    
+         struct result r;    
+         //接收客户端消息    
+         struct expersion rq;    
+         int size = recv(sock,&rq,sizeof(rq),0);    
+         if(size > 0)    
+         {
+            r.code = 0;
+            r.ret = 0;
+            switch(rq.option)
+            {
+                case '+':
+                  r.ret = rq.x+rq.y;
+                  break;
+                case '-':
+                  r.ret = rq.x-rq.y;
+                  break;
+                case '*':
+                  r.ret = rq.x*rq.y;
+                  break;
+                case '/':
+                  if(rq.y == 0)
+                  {
+                      r.code = 1;
+                  }
+                  else 
+                    r.ret = rq.x/rq.y;
+                  break;
+                default:
+                  r.code = 2;
+                  break;
+            }
+            //发送消息
+            if(send(sock,&r,sizeof(r),0) <= 0)
+            {
+                std::cerr<<"send error..."<<std::endl;
+            }
+         }
+      }
+      void cal(struct expersion* exp)
+      
+{                                                                              
+                                                                               
+                       
+          //发送
+          if(send(sock,exp,sizeof(*exp),0) <= 0)
+          {
+              std::cout<<"send error"<<std::endl;
+          }
+  
+          //接收数据
+          struct result rt;
+          recv(sock,&rt,sizeof(rt),0);
+          //输出结果
+          if(rt.code == 0)
+          {
+            std::cout<<"ret = "<<rt.ret<<std::endl;
+          }
+          else if(rt.code == 1)
+          {
+              std::cout<<"除0错误"<<std::endl;
+          }
+          else 
+          {
+              std::cout<<"出错"<<std::endl;
+          }
+  
+      }
+      //开始运行
+      void start()
+      {
+          //链接
+          struct sockaddr_in serverAddr;
+          serverAddr.sin_family = AF_INET;
+          serverAddr.sin_port = htons(port);
+          serverAddr.sin_addr.s_addr = inet_addr(ip.c_str());
+  
+          if(connect(sock,(struct sockaddr*)&serverAddr,sizeof(serverAddr)) 
+== -1)
+          {
+              std::cerr<<"client connect error..."<<std::endl;
+              exit(1);
+          }
+                                                                               
+                                                                               
+                             
+          //输入数据
+          struct expersion exp;
+          std::cout<<"client#";
+          std::cin>>exp.x>>exp.option>>exp.y;
+              
+          //计算
+          cal(&exp);
+      }
+  
+      //析构函数
+      ~calClient()
+      {
+          close(sock);
+      }
+  };  
+
+
+//protocol.hpp
+#ifndef __PROTOCOL_H__    
+#define __PROTOCOL_H__     
+    
+struct expersion    
+{    
+    int x;//左操作数    
+    int y;//右操作数    
+    char option;//运算符    
+};    
+    
+    
+/*规定    
+ *code == 0,表示正确    
+ *code == 1，表示除0错误    
+ *code == 2,表示运算符不存在    
+ *code == 3,操作数错误    
+ * */    
+struct 
+result                                                                         
+                                                                               
+                      
+{    
+    int code;//错误码    
+    int ret;;//结果    
+};    
+    
+#endif

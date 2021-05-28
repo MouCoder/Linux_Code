@@ -1,0 +1,98 @@
+#pragma once                                                                                                                                                            
+ 
+#include<iostream>
+#include<stdlib.h>
+#include<arpa/inet.h>
+#include<sys/socket.h>
+#include<sys/types.h>
+#include<unistd.h>
+#include<signal.h>
+#include<string>
+ 
+class HttpServer
+{
+private:
+    int port;
+    int lsock;
+public:
+    HttpServer(int p):port(p),lsock(-1)
+    {}
+    void InitHtppServer()
+    {
+        signal(SIGCHLD,SIG_IGN);
+        //创建套接字
+        lsock = socket(AF_INET,SOCK_STREAM,0);
+ 
+        struct sockaddr_in local;
+        local.sin_family = AF_INET;
+        local.sin_port = htons(port);
+        local.sin_addr.s_addr = INADDR_ANY;
+        //绑定
+        if(bind(lsock,(struct sockaddr*)&local,sizeof(local)) < 0)
+        {
+            //绑定失败
+            std::cerr<<"bind error..."<<std::endl;
+            exit(1);        }
+ 
+        //监听
+        if(listen(lsock,5) < 0)
+        {
+            std::cerr<<"listen error..."<<std::endl;
+            exit(2);
+        }
+    }
+    void service(int sock)
+    {
+        //接收
+        char buf[1024];
+        int len = recv(sock,buf,sizeof(buf),0);
+        buf[len] = 0;
+        
+        std::cout<<buf<<std::endl;
+        //拼接响应报格式
+        std::string buffer = "";
+        buffer += "http1.0 200 OK\r\n";//响应行
+        buffer += "context-length:1024\r\n";
+        buffer += "connection:keep-alive\r\n";
+        buffer += "\r\n";
+        buffer += "<!DOCTYPE html>\
+                   <html>\
+                   <head>\
+                   <title>hhhhhh</title>\
+                   </head>\
+                   <body>\                                                                                                                                              
+                       <h1>我的第一个标题</h1>\
+                           <p>我的第一个段落。</p>\
+                           </body>\
+                           </html>";
+    }
+    void start()
+    {
+        //accept
+        struct sockaddr_in client;
+        socklen_t len;
+        while(1)
+        {
+            int sock = accept(lsock,(struct sockaddr*)&client,&len);
+            if(sock < 0)
+            {
+                //accept失败
+                std::cerr<<"accept error..."<<std::endl;
+                continue;
+            }
+            //创建子进程
+            if(fork())
+            {
+                close(lsock);
+                service(sock);
+                exit(0);
+            }
+            close(sock);
+        }
+    }
+    ~HttpServer()
+    {
+        if(lsock >= 0)
+            close(lsock);
+    }
+};

@@ -1,0 +1,38 @@
+#include<iostream>    
+#include<unistd.h>    
+#include<fcntl.h>    
+    
+using namespace std;    
+//轮方式读取标准输入    
+void SetNoBlock(int fd)    
+{    
+    //读取当前文件描述符的属性    
+    int fd1 = fcntl(fd,F_GETFL);    
+    if(fd1 < 0)    
+    {    
+        cerr<<"fcntl error..."<<endl;    
+        return;    
+    }    
+    //设置文件描述符的属性    
+    fcntl(fd,F_SETFL,fd1 | O_NONBLOCK);    
+}    
+    
+int main()    
+{    
+    SetNoBlock(0);                                                                                                                                                         
+    while(1)                
+    {                       
+        char buf[1024] = {0};    
+        char ch;            
+        cin>>ch;            
+        size_t num = read(0,buf,sizeof(buf)-1);    
+                            
+        cout<<"---------------------------"<<endl;    
+        sleep(1);           
+                            
+        if(num > 0)         
+                cout<<buf<<endl;
+
+    }
+    return 0;
+}
